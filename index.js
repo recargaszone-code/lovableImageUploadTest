@@ -27,7 +27,7 @@ app.post('/send', upload.single('file'), async (req, res) => {
   let filesArray = [];
   let optimisticImageUrls = [];
 
-  // ==================== UPLOAD DE IMAGEM ====================
+  // ==================== 1. UPLOAD DA IMAGEM ====================
   if (file) {
     try {
       // 1. Gerar Upload URL
@@ -39,13 +39,13 @@ app.post('/send', upload.single('file'), async (req, res) => {
           'Origin': 'https://lovable.dev'
         },
         body: JSON.stringify({
-          file_name: file.originalname || `image_${Date.now()}.webp`,
+          file_name: file.originalname || `imagem_${Date.now()}.webp`,
           content_type: file.mimetype
         })
       });
       const uploadData = await uploadRes.json();
 
-      // 2. Fazer upload da imagem
+      // 2. Fazer upload real da imagem
       await fetch(uploadData.url, {
         method: 'PUT',
         body: file.buffer
@@ -77,7 +77,7 @@ app.post('/send', upload.single('file'), async (req, res) => {
       optimisticImageUrls = [downloadData.url];
 
     } catch (err) {
-      return res.status(500).json({ success: false, error: 'Erro no upload da imagem: ' + err.message });
+      return res.status(500).json({ success: false, error: 'Erro ao fazer upload da imagem: ' + err.message });
     }
   }
 
@@ -137,11 +137,8 @@ app.post('/send', upload.single('file'), async (req, res) => {
 });
 
 // ======================= DOCUMENTAÇÃO =======================
-app.get('/docs', (req, res) => {
-  res.send(`<h1>API com Upload de Imagem - Funcionando</h1>`);
-});
-
+app.get('/docs', (req, res) => res.send('<h1>API com Upload de Imagem - OK</h1>'));
 app.get('/', (req, res) => res.redirect('/docs'));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('✅ API rodando'));
+app.listen(PORT, () => console.log('✅ API com upload de imagem rodando!'));
