@@ -27,9 +27,16 @@ app.post('/send', upload.single('file'), async (req, res) => {
   let filesArray = [];
   let optimisticImageUrls = [];
 
-  // ==================== 1. UPLOAD DA IMAGEM ====================
   if (file) {
     try {
+      // === GERA NOME ÚNICO A CADA UPLOAD ===
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 8);
+      const extension = file.originalname ? file.originalname.split('.').pop() : 'jpg';
+      const uniqueFileName = `image_${timestamp}_${randomStr}.${extension}`;
+
+      console.log('Enviando imagem com nome único:', uniqueFileName);
+
       // 1. Gerar Upload URL
       const uploadRes = await fetch('https://api.lovable.dev/files/generate-upload-url', {
         method: 'POST',
@@ -39,17 +46,33 @@ app.post('/send', upload.single('file'), async (req, res) => {
           'Origin': 'https://lovable.dev'
         },
         body: JSON.stringify({
-          file_name: file.originalname || `imagem_${Date.now()}.webp`,
-          content_type: file.mimetype
+          file_name: uniqueFileName,
+          content_type: file.mimetype || 'image/jpeg'
         })
       });
-      const uploadData = await uploadRes.json();
 
-      // 2. Fazer upload real da imagem
-      await fetch(uploadData.url, {
+      if (!uploadRes.ok) {
+        const errText = await uploadRes.text();
+        throw new Error(`Generate upload URL falhou: ${uploadRes.status} - ${errText}`);
+      }
+
+      const uploadData = await uploadRes.json();
+      const uploadUrl = uploadData.url;
+
+      if (!uploadUrl || !uploadUrl.startsWith('http')) {
+        throw new Error('URL de upload inválida');
+      }
+
+      // 2. Fazer upload real
+      const putRes = await fetch(uploadUrl, {
         method: 'PUT',
-        body: file.buffer
+        body: file.buffer,
+        headers: { 'Content-Type': file.mimetype || 'image/jpeg' }
       });
+
+      if (!putRes.ok) {
+        throw new Error(`Upload para storage falhou: ${putRes.status}`);
+      }
 
       // 3. Gerar Download URL
       const downloadRes = await fetch('https://api.lovable.dev/files/generate-download-url', {
@@ -60,23 +83,30 @@ app.post('/send', upload.single('file'), async (req, res) => {
           'Origin': 'https://lovable.dev'
         },
         body: JSON.stringify({
-          dir_name: uploadData.url.split('/').slice(-2, -1)[0],
-          file_name: uploadData.url.split('/').pop().split('?')[0]
+          dir_name: uploadUrl.split('/').slice(-2, -1)[0],
+          file_name: uniqueFileName
         })
       });
+
+      if (!downloadRes.ok) {
+        const errText = await downloadRes.text();
+        throw new Error(`Generate download URL falhou: ${downloadRes.status}`);
+      }
+
       const downloadData = await downloadRes.json();
 
-      const fileId = uploadData.url.split('/').pop().split('?')[0];
-
       filesArray = [{
-        file_id: fileId,
-        file_name: file.originalname || 'imagem.webp',
+        file_id: uniqueFileName,
+        file_name: file.originalname || uniqueFileName,
         type: "user_upload"
       }];
 
       optimisticImageUrls = [downloadData.url];
 
+      console.log('✅ Imagem enviada com sucesso. Novo file_id:', uniqueFileName);
+
     } catch (err) {
+      console.error('Erro no upload:', err.message);
       return res.status(500).json({ success: false, error: 'Erro ao fazer upload da imagem: ' + err.message });
     }
   }
@@ -132,13 +162,12 @@ app.post('/send', upload.single('file'), async (req, res) => {
     });
 
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'Erro ao enviar prompt: ' + err.message });
   }
 });
 
-// ======================= DOCUMENTAÇÃO =======================
-app.get('/docs', (req, res) => res.send('<h1>API com Upload de Imagem - OK</h1>'));
 app.get('/', (req, res) => res.redirect('/docs'));
+app.get('/docs', (req, res) => res.send('<h1>API Lovable - Upload com Nome Único</h1>'));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('✅ API com upload de imagem rodando!'));
+app.listen(PORT, () => console.log('✅ API rodando'));
