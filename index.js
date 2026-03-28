@@ -27,15 +27,16 @@ app.post('/send', upload.single('file'), async (req, res) => {
   let filesArray = [];
   let optimisticImageUrls = [];
 
-  // ==================== UPLOAD DA IMAGEM (se enviada) ====================
+  // ==================== UPLOAD DE IMAGEM ====================
   if (file) {
     try {
-      // 1. Gerar URL de upload
+      // 1. Gerar Upload URL
       const uploadRes = await fetch('https://api.lovable.dev/files/generate-upload-url', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Origin': 'https://lovable.dev'
         },
         body: JSON.stringify({
           file_name: file.originalname || `image_${Date.now()}.webp`,
@@ -44,18 +45,19 @@ app.post('/send', upload.single('file'), async (req, res) => {
       });
       const uploadData = await uploadRes.json();
 
-      // 2. Fazer upload real da imagem
+      // 2. Fazer upload da imagem
       await fetch(uploadData.url, {
         method: 'PUT',
         body: file.buffer
       });
 
-      // 3. Gerar URL de download
+      // 3. Gerar Download URL
       const downloadRes = await fetch('https://api.lovable.dev/files/generate-download-url', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Origin': 'https://lovable.dev'
         },
         body: JSON.stringify({
           dir_name: uploadData.url.split('/').slice(-2, -1)[0],
@@ -134,8 +136,12 @@ app.post('/send', upload.single('file'), async (req, res) => {
   }
 });
 
+// ======================= DOCUMENTAÇÃO =======================
+app.get('/docs', (req, res) => {
+  res.send(`<h1>API com Upload de Imagem - Funcionando</h1>`);
+});
+
 app.get('/', (req, res) => res.redirect('/docs'));
-app.get('/docs', (req, res) => res.send('<h1>API com Upload de Imagem - Funcionando</h1>'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('✅ API rodando'));
